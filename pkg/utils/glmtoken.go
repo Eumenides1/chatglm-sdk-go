@@ -12,8 +12,8 @@ import (
 var cachedTokens *cache.Cache
 var sugarLogger *zap.SugaredLogger
 
-// Expire_Millis Token过期时间 这里的单位是分钟
-const Expire_Millis = 30
+// ExpireMillis Token过期时间 这里的单位是分钟
+const ExpireMillis = 30
 
 type GlmToken struct {
 	Token string
@@ -23,7 +23,7 @@ type GlmToken struct {
 type APICredentials struct {
 	ApiKey         string // 登录创建 ApiKey <a href="https://open.bigmodel.cn/usercenter/apikeys">apikeys</a>
 	ApiSecret      string // apiKey的后半部分 828902ec516c45307619708d3e780ae1.w5eKiLvhnLP8MtIf 取 w5eKiLvhnLP8MtIf 使用
-	expireDuration int64  // 过期时间
+	ExpireDuration int    // 过期时间
 }
 
 func init() {
@@ -33,7 +33,7 @@ func init() {
 }
 
 func NewGlmToken(credentials *APICredentials) *GlmToken {
-	token, err := generateToken(credentials.ApiKey, []byte(credentials.ApiSecret))
+	token, err := generateToken(credentials.ApiKey, []byte(credentials.ApiSecret), credentials.ExpireDuration)
 	if err != nil {
 		sugarLogger.Errorf(" generate token failed: %s", err)
 		return nil
@@ -43,9 +43,14 @@ func NewGlmToken(credentials *APICredentials) *GlmToken {
 	}
 }
 
-func generateToken(apiKey string, apiSecret []byte) (string, error) {
-	// 默认缓存半小时
-	expireDuration := Expire_Millis * time.Minute
+func generateToken(apiKey string, apiSecret []byte, expireDuration int) (string, error) {
+	var expireTime time.Duration
+	if expireDuration == 0 {
+		// 默认缓存半小时
+		expireTime = ExpireMillis * time.Minute
+	} else {
+		expireTime = time.Duration(expireDuration) * time.Minute
+	}
 
 	// 缓存token
 	if token := findTokenInCache(apiKey); token != "" {
@@ -58,7 +63,7 @@ func generateToken(apiKey string, apiSecret []byte) (string, error) {
 	}
 	claims := jwt.MapClaims{
 		"api_key":   apiKey,
-		"exp":       time.Now().Add(expireDuration).UnixNano() / int64(time.Millisecond),
+		"exp":       time.Now().Add(expireTime).UnixNano() / int64(time.Millisecond),
 		"timestamp": time.Now().UnixNano() / int64(time.Millisecond),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
