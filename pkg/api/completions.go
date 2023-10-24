@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -13,6 +15,8 @@ const (
 	CHATGLM_PRO      = "chatglm_pro"      // 适用于对知识量、推理能力、创造力要求较高的场景
 )
 
+var ErrModelNotSupported = errors.New("model  is not supported")
+
 type ChatCompletionRequest struct {
 	Model       string   `json:"model"`       // 模型
 	RequestId   string   `json:"request_id"`  // 请求ID
@@ -21,6 +25,15 @@ type ChatCompletionRequest struct {
 	Prompt      []Prompt `json:"prompt"`      // 输入给模型的会话信息,用户输入的内容；role=user,挟带历史的内容；role=assistant
 	Incremental bool     `json:"incremental"` // 智普AI sse 固定参数 incremental = true 【增量返回】
 	SSEFormat   string   `json:"sseformat"`   // 用于兼容解决sse增量模式okhttpsse截取data:后面空格问题, [data: hello]。只在增量模式下使用sseFormat。
+}
+
+func (c ChatCompletionRequest) String() string {
+	// 将 ChatCompletionRequest 结构体转换为 JSON 字符串
+	data, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 type Prompt struct {
@@ -53,5 +66,5 @@ func NewChatCompletionRequest(model string, temperature, topP float64, prompt []
 }
 
 type Completions interface {
-	Completions(model string)
+	Completions(apiSecretKey string, request *ChatCompletionRequest) (string, error)
 }
